@@ -12,24 +12,29 @@ export default function HomePage() {
   const [comparativa, setComparativa] = useState<any[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
+  const [errorConexion, setErrorConexion] = useState<string | null>(null);
 
   // Cargar catálogo estandarizado desde Supabase
   useEffect(() => {
     async function obtenerCatalogo() {
       try {
+        setErrorConexion(null);
         const { data, error } = await supabase
           .from('catalogo_maestro')
           .select('*')
           .order('nombre_estandarizado', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         setProductos(data || []);
         if (data && data.length > 0) {
           seleccionarProducto(data[0]);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error cargando catálogo:', err);
+        setErrorConexion(err.message || 'Error al conectar con Supabase');
       } finally {
         setCargandoLista(false);
       }
@@ -89,6 +94,13 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* Alerta si falla la base de datos */}
+      {errorConexion && (
+        <div className="bg-red-50 border-b border-red-200 p-4 text-center text-sm text-red-700">
+          <strong>Error de Base de Datos:</strong> {errorConexion}. Verifica las políticas RLS en Supabase o las variables de entorno.
+        </div>
+      )}
+
       {/* Cuerpo Layout Dividido */}
       <div className="flex-1 flex overflow-hidden">
         {/* Panel Izquierdo: Lista de Productos */}
@@ -99,6 +111,8 @@ export default function HomePage() {
 
           {cargandoLista ? (
             <p className="text-gray-400 text-sm">Cargando catálogo...</p>
+          ) : productos.length === 0 ? (
+            <p className="text-sm text-gray-500">No hay productos en el catálogo maestro.</p>
           ) : (
             <div className="space-y-2">
               {productos.map((item) => (
