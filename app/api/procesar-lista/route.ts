@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     let partesPrompt: any[] = [];
 
-    // 1. LECTURA Y EXTRACCIÓN SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
+    // 1. EXTRAER CONTENIDO SEGÚN EL TIPO DE ARCHIVO
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. PROMPT DE EXTRACCIÓN Y ESTANDARIZACIÓN CON MODELO MAESTRO
+    // 2. INSTRUCCIONES DE ESTANDARIZACIÓN
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -80,21 +80,35 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. EJECUCIÓN CON EL MODELO OFICIAL GEMINI 3.8 FLASH
+    // 3. ESTRATEGIA DE REINTENTO CON MANEJO DE RETARDO (EXPONENTIAL BACKOFF)
     let responseText = '';
-    
-    try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
-      const result = await model.generateContent(partesPrompt);
-      responseText = result.response.text();
-    } catch (err: any) {
-      console.error('Error al invocar el modelo Gemini:', err);
-      throw new Error(
-        'El servicio de IA no se encuentra disponible momentáneamente. Reintenta en unos segundos.'
+    const modelosDisponibles = ['gemini-3.8-flash', 'gemini-2.5-flash'];
+    let ultimoError: any = null;
+
+    for (const nombreModelo of modelosDisponibles) {
+      try {
+        const model = genAI.getGenerativeModel({ model: nombreModelo });
+        const result = await model.generateContent(partesPrompt);
+        responseText = result.response.text();
+        if (responseText) break; // Si obtuvimos respuesta exitosa, salimos del bucle
+      } catch (err: any) {
+        console.warn(`Error o cuota agotada en ${nombreModelo}, intentando alternativa...`, err);
+        ultimoError = err;
+        // Pausa breve de 1 segundo antes de reintentar
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!responseText) {
+      throw (
+        ultimoError ||
+        new Error(
+          'La API de Google Gemini superó la cuota de peticiones gratuitas. Por favor aguarda 30 segundos y vuelve a intentar.'
+        )
       );
     }
 
-    // 4. LIMPIEZA DEL JSON RESULTANTE
+    // 4. DEVOLUCIÓN DE DATOS LIMPIOS EN FORMATO JSON
     const jsonLimpio = responseText
       .replace(/```json/g, '')
       .replace(/```/g, '')
