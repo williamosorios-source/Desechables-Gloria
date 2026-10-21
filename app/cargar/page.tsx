@@ -24,9 +24,20 @@ export default function CargarListaPage() {
     cargarDatos();
   }, []);
 
-  const handleCrearProveedor = async () => {
+const handleCrearProveedor = async () => {
     if (!nuevoProveedor.trim()) return;
-    const { data } = await supabase.from('proveedores').insert([{ nombre: nuevoProveedor }]).select().single();
+    
+    const { data, error } = await supabase
+      .from('proveedores')
+      .insert([{ nombre: nuevoProveedor }])
+      .select()
+      .single();
+
+    if (error) {
+      alert('Error de Supabase: ' + error.message);
+      return;
+    }
+
     if (data) {
       setNuevoProveedor('');
       cargarDatos();
