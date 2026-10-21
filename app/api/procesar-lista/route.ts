@@ -80,22 +80,21 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. ESTRATEGIA DE REINTENTO CON MANEJO DE RETARDO (EXPONENTIAL BACKOFF)
+    // 3. ESTRATEGIA DE REINTENTO EXCLUSIVA CON MODELOS VALIDADOS
     let responseText = '';
-    const modelosDisponibles = ['gemini-3.8-flash', 'gemini-2.5-flash'];
+    const modelosValidos = ['gemini-3.8-flash', 'gemini-1.5-flash-latest'];
     let ultimoError: any = null;
 
-    for (const nombreModelo of modelosDisponibles) {
+    for (const nombreModelo of modelosValidos) {
       try {
         const model = genAI.getGenerativeModel({ model: nombreModelo });
         const result = await model.generateContent(partesPrompt);
         responseText = result.response.text();
-        if (responseText) break; // Si obtuvimos respuesta exitosa, salimos del bucle
+        if (responseText) break;
       } catch (err: any) {
-        console.warn(`Error o cuota agotada en ${nombreModelo}, intentando alternativa...`, err);
+        console.warn(`Error con ${nombreModelo}, reintentando en 1.5s...`, err);
         ultimoError = err;
-        // Pausa breve de 1 segundo antes de reintentar
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     }
 
@@ -103,7 +102,7 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
       throw (
         ultimoError ||
         new Error(
-          'La API de Google Gemini superó la cuota de peticiones gratuitas. Por favor aguarda 30 segundos y vuelve a intentar.'
+          'La API sobrepasó el límite de peticiones por minuto. Espera 20 segundos y vuelve a intentar.'
         )
       );
     }
