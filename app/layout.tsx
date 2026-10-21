@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import './globals.css';
+import './globals.css'; // <-- ESTA LÍNEA ES INDISPENSABLE
 
 export const metadata: Metadata = {
   title: 'Cotizador & Comparador Inteligente',
@@ -15,7 +15,6 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
-        {/* Navbar Moderno */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
           <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -44,7 +43,6 @@ export default function RootLayout({
           </div>
         </header>
 
-        {/* Contenido Principal */}
         <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8">
           {children}
         </main>
