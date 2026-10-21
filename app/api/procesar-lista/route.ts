@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as XLSX from 'xlsx';
 
-// Instanciamos el cliente especificando la versión de API 'v1' estable
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
@@ -81,35 +80,38 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. REINTENTOS CON MANEJO DE SATURACIÓN (503) Y VERIFICACIÓN DE RESPUESTA
+    // 3. ESTRATEGIA DE REINTENTO ROBUSTA: FLASH -> PRO
     let responseText = '';
-    const maxReintentos = 4;
+    const modelosAReintentar = ['gemini-3.8-flash', 'gemini-3.8-pro'];
     let ultimoError: any = null;
 
-    // Forzamos el uso de la versión v1 estable para evitar volatilidades de endpoints v1beta
-    const model = genAI.getGenerativeModel(
-      { model: 'gemini-3.8-flash' },
-      { apiVersion: 'v1' }
-    );
-
-    for (let i = 0; i < maxReintentos; i++) {
-      try {
-        const result = await model.generateContent(partesPrompt);
-        responseText = result.response.text();
-        if (responseText) break;
-      } catch (err: any) {
-        console.warn(`Intento ${i + 1} en gemini-3.8-flash presentó saturación. Pausando...`, err);
-        ultimoError = err;
-        // Pausa incremental con tiempos de espera progresivos (3s, 6s, 9s, 12s)
-        await new Promise((resolve) => setTimeout(resolve, (i + 1) * 3000));
+    for (const nombreModelo of modelosAReintentar) {
+      // Realizamos hasta 2 reintentos por modelo con pausa de espera
+      for (let intento = 0; intento < 2; intento++) {
+        try {
+          const model = genAI.getGenerativeModel({ model: nombreModelo });
+          const result = await model.generateContent(partesPrompt);
+          responseText = result.response.text();
+          if (responseText) break;
+        } catch (err: any) {
+          console.warn(
+            `El modelo ${nombreModelo} (intento ${intento + 1}) reportó saturación (503). Esperando reintento...`,
+            err
+          );
+          ultimoError = err;
+          // Pausa de 2.5 segundos para liberar el hilo
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+        }
       }
+      // Si obtuvimos respuesta con el modelo actual, salimos del bucle principal
+      if (responseText) break;
     }
 
     if (!responseText) {
       throw (
         ultimoError ||
         new Error(
-          'Los servidores de Google se encuentran momentáneamente saturados. Por favor presiona el botón de procesar nuevamente.'
+          'Los servidores de Google AI están experimentando un pico de tráfico momentáneo. Por favor, vuelve a presionar el botón de procesar en unos segundos.'
         )
       );
     }
