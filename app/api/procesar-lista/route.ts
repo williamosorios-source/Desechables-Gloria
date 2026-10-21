@@ -74,10 +74,7 @@ Responde ÚNICAMENTE en JSON plano válido (sin markdown ni código \`\`\`json) 
     partesPrompt.push(instucciones);
 
     // Llamada a Gemini 1.5 Flash (soporta imágenes, PDFs y texto)
-   const model = genAI.getGenerativeModel(
-  { model: 'gemini-1.5-flash' },
-  { apiVersion: 'v1beta' }
-);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(partesPrompt);
     const responseText = result.response.text();
 
