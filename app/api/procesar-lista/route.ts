@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as XLSX from 'xlsx';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Falta la variable de entorno GEMINI_API_KEY en Vercel' },
-        { status: 500 }
-      );
-    }
-
     const formData = await req.formData();
     const file = formData.get('archivo') as File;
     const catalogoMaestroStr = formData.get('catalogoMaestro') as string;
@@ -27,9 +22,9 @@ export async function POST(req: Request) {
     const mimeType = file.type;
     const fileName = file.name.toLowerCase();
 
-    let parts: any[] = [];
+    let partesPrompt: any[] = [];
 
-    // 1. EXTRAER CONTENIDO DEL ARCHIVO (Excel, PDF, Imagen, TXT)
+    // 1. LECTURA Y EXTRACCIÓN SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -38,23 +33,26 @@ export async function POST(req: Request) {
         contenidoExcel += XLSX.utils.sheet_to_csv(sheet) + '\n';
       });
 
-      parts.push({
-        text: `CONTENIDO EXTRAÍDO DEL EXCEL:\n"""\n${contenidoExcel}\n"""`
-      });
-    } else if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
-      parts.push({
-        inline_data: {
-          mime_type: mimeType === 'application/pdf' ? 'application/pdf' : mimeType,
+      partesPrompt.push(
+        `CONTENIDO EXTRAÍDO DEL EXCEL:\n"""\n${contenidoExcel}\n"""`
+      );
+    } else if (
+      mimeType.startsWith('image/') ||
+      mimeType === 'application/pdf'
+    ) {
+      partesPrompt.push({
+        inlineData: {
           data: buffer.toString('base64'),
+          mimeType: mimeType === 'application/pdf' ? 'application/pdf' : mimeType,
         },
       });
     } else {
-      parts.push({
-        text: `TEXTO DEL DOCUMENTO:\n"""\n${buffer.toString('utf-8')}\n"""`
-      });
+      partesPrompt.push(
+        `TEXTO DEL DOCUMENTO:\n"""\n${buffer.toString('utf-8')}\n"""`
+      );
     }
 
-    // 2. INSTRUCCIONES DE ESTANDARIZACIÓN
+    // 2. PROMPT DE EXTRACCIÓN Y ESTANDARIZACIÓN CON MODELO MAESTRO
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -80,35 +78,23 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 }
 `;
 
-    parts.push({ text: instrucciones });
+    partesPrompt.push(instrucciones);
 
-    // 3. PETICIÓN HTTP DIRECTA AL MODELO gemini-3.8-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{ parts }],
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error('Error directo de Google API:', data);
-      throw new Error(data?.error?.message || `Error ${res.status}: Fallo en la API de Gemini`);
+    // 3. EJECUCIÓN CON EL MODELO OFICIAL GEMINI 3.8 FLASH
+    let responseText = '';
+    
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+      const result = await model.generateContent(partesPrompt);
+      responseText = result.response.text();
+    } catch (err: any) {
+      console.error('Error al invocar el modelo Gemini:', err);
+      throw new Error(
+        'El servicio de IA no se encuentra disponible momentáneamente. Reintenta en unos segundos.'
+      );
     }
 
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!responseText) {
-      throw new Error('Google Gemini no devolvió texto en la respuesta.');
-    }
-
-    // 4. PARSEO DE RESULTADOS
+    // 4. LIMPIEZA DEL JSON RESULTANTE
     const jsonLimpio = responseText
       .replace(/```json/g, '')
       .replace(/```/g, '')
@@ -117,11 +103,10 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
     const resultadoFinal = JSON.parse(jsonLimpio);
 
     return NextResponse.json(resultadoFinal);
-
   } catch (error: any) {
-    console.error('Error en procesar-lista:', error);
+    console.error('Error procesando archivo:', error);
     return NextResponse.json(
-      { error: error.message || 'Error interno procesando el archivo' },
+      { error: error.message || 'Error al procesar el archivo adjunto' },
       { status: 500 }
     );
   }
