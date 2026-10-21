@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
   try {
@@ -27,7 +25,7 @@ ${textoDocumento}
 Extrae los productos y sus precios. Si el producto coincide con alguno del CATÁLOGO MAESTRO, asigna su catalogo_id.
 Si NO coincide, deja "catalogo_id" como null y da una propuesta en "nombre_estandarizado_sugerido".
 
-Responde ÚNICAMENTE en JSON con este formato exacto:
+Responde ÚNICAMENTE en JSON plano sin formato Markdown ni bloques de código, con este formato exacto:
 {
   "productos": [
     {
@@ -40,14 +38,14 @@ Responde ÚNICAMENTE en JSON con este formato exacto:
 }
 `;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    // Limpieza por si Gemini responde envuelto en markdown json
+    const jsonLimpio = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const resultado = JSON.parse(jsonLimpio);
 
-    const resultado = JSON.parse(response.choices[0].message.content || '{}');
     return NextResponse.json(resultado);
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
