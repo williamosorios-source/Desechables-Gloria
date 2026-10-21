@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     let partesPrompt: any[] = [];
 
-    // 1. LECTURA SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
+    // 1. LECTURA Y EXTRACCIÓN SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. PROMPT DE EXTRACTION Y ESTANDARIZACIÓN
+    // 2. PROMPT DE EXTRACCIÓN Y ESTANDARIZACIÓN CON MODELO MAESTRO
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -80,39 +80,21 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. ESTRATEGIA DE FALLBACK CON ALIAS DINÁMICOS COMPATIBLES
-    let result = null;
-    const listaModelos = [
-      'gemini-flash-latest',
-      'gemini-pro-latest',
-      'gemini-2.5-flash',
-    ];
-    let ultimoError = null;
-
-    for (const nombreModelo of listaModelos) {
-      try {
-        const model = genAI.getGenerativeModel({ model: nombreModelo });
-        result = await model.generateContent(partesPrompt);
-        if (result) break;
-      } catch (err: any) {
-        console.warn(
-          `El modelo ${nombreModelo} no respondió. Probando siguiente alias...`
-        );
-        ultimoError = err;
-      }
-    }
-
-    if (!result) {
-      throw (
-        ultimoError ||
-        new Error(
-          'Los modelos de procesamientos están experimentando alta demanda. Intenta de nuevo en un par de segundos.'
-        )
+    // 3. EJECUCIÓN CON EL MODELO OFICIAL GEMINI 3.8 FLASH
+    let responseText = '';
+    
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+      const result = await model.generateContent(partesPrompt);
+      responseText = result.response.text();
+    } catch (err: any) {
+      console.error('Error al invocar el modelo Gemini:', err);
+      throw new Error(
+        'El servicio de IA no se encuentra disponible momentáneamente. Reintenta en unos segundos.'
       );
     }
 
     // 4. LIMPIEZA DEL JSON RESULTANTE
-    const responseText = result.response.text();
     const jsonLimpio = responseText
       .replace(/```json/g, '')
       .replace(/```/g, '')
