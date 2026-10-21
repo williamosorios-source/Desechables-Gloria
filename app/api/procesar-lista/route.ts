@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as XLSX from 'xlsx';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Falta la variable de entorno GEMINI_API_KEY en Vercel' },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get('archivo') as File;
     const catalogoMaestroStr = formData.get('catalogoMaestro') as string;
@@ -22,9 +27,9 @@ export async function POST(req: Request) {
     const mimeType = file.type;
     const fileName = file.name.toLowerCase();
 
-    let partesPrompt: any[] = [];
+    let parts: any[] = [];
 
-    // 1. EXTRAER CONTENIDO SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
+    // 1. PROCESAMIENTO DE ARCHIVO
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -33,26 +38,23 @@ export async function POST(req: Request) {
         contenidoExcel += XLSX.utils.sheet_to_csv(sheet) + '\n';
       });
 
-      partesPrompt.push(
-        `CONTENIDO EXTRAÍDO DEL EXCEL:\n"""\n${contenidoExcel}\n"""`
-      );
-    } else if (
-      mimeType.startsWith('image/') ||
-      mimeType === 'application/pdf'
-    ) {
-      partesPrompt.push({
-        inlineData: {
+      parts.push({
+        text: `CONTENIDO EXTRAÍDO DEL EXCEL:\n"""\n${contenidoExcel}\n"""`
+      });
+    } else if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+      parts.push({
+        inline_data: {
+          mime_type: mimeType === 'application/pdf' ? 'application/pdf' : mimeType,
           data: buffer.toString('base64'),
-          mimeType: mimeType === 'application/pdf' ? 'application/pdf' : mimeType,
         },
       });
     } else {
-      partesPrompt.push(
-        `TEXTO DEL DOCUMENTO:\n"""\n${buffer.toString('utf-8')}\n"""`
-      );
+      parts.push({
+        text: `TEXTO DEL DOCUMENTO:\n"""\n${buffer.toString('utf-8')}\n"""`
+      });
     }
 
-    // 2. INSTRUCCIONES DE ESTANDARIZACIÓN
+    // 2. INSTRUCCIONES
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -78,45 +80,35 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 }
 `;
 
-    partesPrompt.push(instrucciones);
+    parts.push({ text: instrucciones });
 
-    // 3. ESTRATEGIA DE REINTENTO ROBUSTA: FLASH -> PRO
-    let responseText = '';
-    const modelosAReintentar = ['gemini-3.8-flash', 'gemini-3.8-pro'];
-    let ultimoError: any = null;
+    // 3. PETICIÓN DIRECTA POR HTTP REST (Sin depender de librerías intermedias)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-    for (const nombreModelo of modelosAReintentar) {
-      // Realizamos hasta 2 reintentos por modelo con pausa de espera
-      for (let intento = 0; intento < 2; intento++) {
-        try {
-          const model = genAI.getGenerativeModel({ model: nombreModelo });
-          const result = await model.generateContent(partesPrompt);
-          responseText = result.response.text();
-          if (responseText) break;
-        } catch (err: any) {
-          console.warn(
-            `El modelo ${nombreModelo} (intento ${intento + 1}) reportó saturación (503). Esperando reintento...`,
-            err
-          );
-          ultimoError = err;
-          // Pausa de 2.5 segundos para liberar el hilo
-          await new Promise((resolve) => setTimeout(resolve, 2500));
-        }
-      }
-      // Si obtuvimos respuesta con el modelo actual, salimos del bucle principal
-      if (responseText) break;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('Error directo de Google API:', data);
+      throw new Error(data?.error?.message || `Error ${res.status}: Fallo en la API de Gemini`);
     }
+
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!responseText) {
-      throw (
-        ultimoError ||
-        new Error(
-          'Los servidores de Google AI están experimentando un pico de tráfico momentáneo. Por favor, vuelve a presionar el botón de procesar en unos segundos.'
-        )
-      );
+      throw new Error('Google Gemini no devolvió texto en la respuesta.');
     }
 
-    // 4. LIMPIEZA Y DEVOLUCIÓN DE DATOS EN FORMATO JSON
+    // 4. PARSEO DE RESULTADOS
     const jsonLimpio = responseText
       .replace(/```json/g, '')
       .replace(/```/g, '')
@@ -125,10 +117,11 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
     const resultadoFinal = JSON.parse(jsonLimpio);
 
     return NextResponse.json(resultadoFinal);
+
   } catch (error: any) {
-    console.error('Error procesando archivo:', error);
+    console.error('Error en procesar-lista:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al procesar el archivo adjunto' },
+      { error: error.message || 'Error interno procesando el archivo' },
       { status: 500 }
     );
   }
