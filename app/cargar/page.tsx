@@ -8,7 +8,7 @@ export default function CargarListaPage() {
   const [catalogo, setCatalogo] = useState<any[]>([]);
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
   const [nuevoProveedor, setNuevoProveedor] = useState('');
-  const [textoLista, setTextoLista] = useState('');
+  const [archivo, setArchivo] = useState<File | null>(null);
   const [cargandoIA, setCargandoIA] = useState(false);
   const [itemsProcesados, setItemsProcesados] = useState<any[]>([]);
   const [mensaje, setMensaje] = useState('');
@@ -35,54 +35,75 @@ export default function CargarListaPage() {
   };
 
   const handleProcesar = async () => {
-    if (!textoLista || !proveedorSeleccionado) return alert('Selecciona proveedor y escribe la lista');
+    if (!archivo || !proveedorSeleccionado) {
+      alert('Por favor selecciona un proveedor y adjunta un archivo (PDF, Foto, Excel o TXT).');
+      return;
+    }
+
     setCargandoIA(true);
+    setMensaje('');
 
-    const res = await fetch('/api/procesar-lista', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ textoDocumento: textoLista, catalogoMaestro: catalogo }),
-    });
+    try {
+      const formData = new FormData();
+      formData.append('archivo', archivo);
+      formData.append('catalogoMaestro', JSON.stringify(catalogo));
 
-    const data = await res.json();
-    if (data.productos) setItemsProcesados(data.productos);
-    setCargandoIA(false);
+      const res = await fetch('/api/procesar-lista', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.productos) {
+        setItemsProcesados(data.productos);
+      } else {
+        alert(data.error || 'No se pudieron extraer productos del archivo.');
+      }
+    } catch (err) {
+      alert('Error procesando el archivo con IA.');
+    } finally {
+      setCargandoIA(false);
+    }
   };
 
   const handleGuardar = async () => {
-    setMensaje('Guardando en la base de datos...');
-    for (const item of itemsProcesados) {
-      let catId = item.catalogo_id;
-      if (!catId) {
-        const { data: nuevo } = await supabase
-          .from('catalogo_maestro')
-          .insert([{ nombre_estandarizado: item.nombre_estandarizado_sugerido }])
-          .select().single();
-        if (nuevo) catId = nuevo.id;
+    setMensaje('Guardando actualización en la base de datos...');
+    try {
+      for (const item of itemsProcesados) {
+        let catId = item.catalogo_id;
+        if (!catId) {
+          const { data: nuevo } = await supabase
+            .from('catalogo_maestro')
+            .insert([{ nombre_estandarizado: item.nombre_estandarizado_sugerido }])
+            .select().single();
+          if (nuevo) catId = nuevo.id;
+        }
+        if (catId) {
+          await supabase.from('precios_proveedores').insert([{
+            proveedor_id: proveedorSeleccionado,
+            catalogo_id: catId,
+            nombre_original: item.nombre_original,
+            precio: item.precio,
+          }]);
+        }
       }
-      if (catId) {
-        await supabase.from('precios_proveedores').insert([{
-          proveedor_id: proveedorSeleccionado,
-          catalogo_id: catId,
-          nombre_original: item.nombre_original,
-          precio: item.precio,
-        }]);
-      }
+      setMensaje('¡Precios procesados y guardados exitosamente!');
+      setItemsProcesados([]);
+      setArchivo(null);
+    } catch (e) {
+      setMensaje('Error al guardar en Supabase.');
     }
-    setMensaje('¡Precios actualizados exitosamente!');
-    setItemsProcesados([]);
-    setTextoLista('');
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-4xl mx-auto text-slate-900">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Cargar Lista de Proveedor</h1>
-        <p className="text-slate-500 mt-1">Pega el texto crudo enviado por tu proveedor para extraer y estandarizar precios automáticamente.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight">Cargar Lista de Proveedor</h1>
+        <p className="text-slate-500 mt-1">Sube el documento oficial del proveedor (PDF, Foto/Imagen, Excel o TXT) para estructurarlo automáticamente.</p>
       </div>
 
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-        {/* Proveedor selector / creador */}
+        {/* Proveedores */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
@@ -91,16 +112,16 @@ export default function CargarListaPage() {
             <select 
               value={proveedorSeleccionado} 
               onChange={(e) => setProveedorSeleccionado(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <option value="">-- Elige un proveedor --</option>
+              <option value="">-- Selecciona proveedor --</option>
               {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-              O Crear un Nuevo Proveedor
+              O Crear Proveedor Nuevo
             </label>
             <div className="flex gap-2">
               <input
@@ -120,40 +141,57 @@ export default function CargarListaPage() {
           </div>
         </div>
 
-        {/* Textarea */}
+        {/* Carga de Archivo */}
         <div>
           <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-            2. Contenido de la Lista
+            2. Adjuntar Documento o Lista
           </label>
-          <textarea
-            rows={6}
-            value={textoLista}
-            onChange={(e) => setTextoLista(e.target.value)}
-            placeholder="Pega la lista del proveedor en texto (ej. Vaso 7oz blanco x 100u $12.500)..."
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-4 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-sm"
-          />
+          
+          <div className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-8 text-center bg-slate-50 transition-all cursor-pointer relative">
+            <input 
+              type="file" 
+              accept=".pdf, .png, .jpg, .jpeg, .xlsx, .xls, .txt"
+              onChange={(e) => setArchivo(e.target.files?.[0] || null)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            
+            <div className="space-y-2">
+              <div className="text-4xl">📄</div>
+              {archivo ? (
+                <div>
+                  <p className="font-bold text-blue-600 text-lg">{archivo.name}</p>
+                  <p className="text-xs text-slate-400">{(archivo.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="font-semibold text-slate-700">Haz clic para seleccionar o arrastra un archivo aquí</p>
+                  <p className="text-xs text-slate-400 mt-1">Soporta PDFs, Imágenes (JPG/PNG), Excel (.xlsx) y Archivos de Texto</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <button 
           onClick={handleProcesar} 
-          disabled={cargandoIA} 
+          disabled={cargandoIA || !archivo} 
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {cargandoIA ? (
-            <span>✨ Gemini está procesando la lista...</span>
+            <span>✨ Gemini está leyendo el archivo y extrayendo los datos...</span>
           ) : (
-            <span>⚡ Procesar Lista con Inteligencia Artificial</span>
+            <span>⚡ Leer Archivo y Procesar con IA</span>
           )}
         </button>
       </div>
 
-      {/* Tabla de Validación Humana */}
+      {/* Tabla de Resultados */}
       {itemsProcesados.length > 0 && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-800">3. Validación y Estandarización Sugerida</h2>
+            <h2 className="text-lg font-bold text-slate-800">3. Tabla de Productos Detectados</h2>
             <span className="bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1 rounded-full border border-blue-100">
-              {itemsProcesados.length} Productos detectados
+              {itemsProcesados.length} Productos
             </span>
           </div>
 
@@ -161,8 +199,8 @@ export default function CargarListaPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 text-xs uppercase font-semibold border-b border-slate-200">
-                  <th className="p-4">Nombre Original</th>
-                  <th className="p-4">Sugerencia Estándar</th>
+                  <th className="p-4">Nombre Original en Documento</th>
+                  <th className="p-4">Estandarización Sugerida</th>
                   <th className="p-4 text-right">Precio Detectado</th>
                 </tr>
               </thead>
@@ -188,7 +226,7 @@ export default function CargarListaPage() {
             onClick={handleGuardar} 
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
           >
-            ✓ Confirmar y Guardar en Supabase
+            ✓ Guardar Lista Convertida en Supabase
           </button>
         </div>
       )}
