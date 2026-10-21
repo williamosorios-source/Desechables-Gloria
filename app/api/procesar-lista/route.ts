@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as XLSX from 'xlsx';
 
+// Instanciamos el cliente especificando la versión de API 'v1' estable
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
 
     let partesPrompt: any[] = [];
 
-    // 1. EXTRAER CONTENIDO SEGÚN EL TIPO DE ARCHIVO
+    // 1. EXTRAER CONTENIDO SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -80,12 +81,16 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. REINTENTOS CON EXPONENTIAL BACKOFF ÚNICAMENTE SOBRE MODELO OFICIAL 'gemini-3.8-flash'
+    // 3. REINTENTOS CON MANEJO DE SATURACIÓN (503) Y VERIFICACIÓN DE RESPUESTA
     let responseText = '';
-    const maxReintentos = 3;
+    const maxReintentos = 4;
     let ultimoError: any = null;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+    // Forzamos el uso de la versión v1 estable para evitar volatilidades de endpoints v1beta
+    const model = genAI.getGenerativeModel(
+      { model: 'gemini-3.8-flash' },
+      { apiVersion: 'v1' }
+    );
 
     for (let i = 0; i < maxReintentos; i++) {
       try {
@@ -93,10 +98,10 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
         responseText = result.response.text();
         if (responseText) break;
       } catch (err: any) {
-        console.warn(`Intento ${i + 1} falló en gemini-3.8-flash. Reintentando...`, err);
+        console.warn(`Intento ${i + 1} en gemini-3.8-flash presentó saturación. Pausando...`, err);
         ultimoError = err;
-        // Espera incremental: 2s, 4s, 6s...
-        await new Promise((resolve) => setTimeout(resolve, (i + 1) * 2000));
+        // Pausa incremental con tiempos de espera progresivos (3s, 6s, 9s, 12s)
+        await new Promise((resolve) => setTimeout(resolve, (i + 1) * 3000));
       }
     }
 
@@ -104,12 +109,12 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
       throw (
         ultimoError ||
         new Error(
-          'El servidor de Google está experimentando alta demanda. Espera 15 segundos e intenta de nuevo.'
+          'Los servidores de Google se encuentran momentáneamente saturados. Por favor presiona el botón de procesar nuevamente.'
         )
       );
     }
 
-    // 4. DEVOLUCIÓN DE DATOS LIMPIOS EN FORMATO JSON
+    // 4. LIMPIEZA Y DEVOLUCIÓN DE DATOS EN FORMATO JSON
     const jsonLimpio = responseText
       .replace(/```json/g, '')
       .replace(/```/g, '')
