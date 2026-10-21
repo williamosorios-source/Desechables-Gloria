@@ -5,43 +5,30 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-export default function HomePage() {
-  const [productos, setProductos] = useState<any[]>([]);
-  const [productoSeleccionado, setProductoSeleccionado] = useState<any | null>(null);
-  const [comparativa, setComparativa] = useState<any[]>([]);
-  const [cargandoLista, setCargandoLista] = useState(true);
-  const [cargandoComparativa, setCargandoComparativa] = useState(false);
+export default function ProveedoresPage() {
+  const [proveedores, setProveedores] = useState<any[]>([]);
+  const [proveedorSeleccionado, setProveedorSeleccionado] = useState<any | null>(null);
+  const [productosProveedor, setProductosProveedor] = useState<any[]>([]);
 
-  // Cargar catálogo maestro desde Supabase al montar la página
   useEffect(() => {
-    async function obtenerCatalogo() {
+    async function obtenerProveedores() {
       try {
         const { supabase } = await import('@/lib/supabase');
-        const { data, error } = await supabase
-          .from('catalogo_maestro')
-          .select('*')
-          .order('nombre_estandarizado', { ascending: true });
-
+        const { data, error } = await supabase.from('proveedores').select('*').order('nombre');
         if (error) throw error;
-
-        setProductos(data || []);
+        setProveedores(data || []);
         if (data && data.length > 0) {
-          seleccionarProducto(data[0]);
+          cargarProductosProveedor(data[0]);
         }
       } catch (err) {
-        console.error('Error cargando catálogo:', err);
-      } finally {
-        setCargandoLista(false);
+        console.error('Error cargando proveedores:', err);
       }
     }
-    obtenerCatalogo();
+    obtenerProveedores();
   }, []);
 
-  // Cargar comparativa de precios por proveedor al seleccionar un producto
-  const seleccionarProducto = async (prod: any) => {
-    setProductoSeleccionado(prod);
-    setCargandoComparativa(true);
-
+  const cargarProductosProveedor = async (prov: any) => {
+    setProveedorSeleccionado(prov);
     try {
       const { supabase } = await import('@/lib/supabase');
       const { data, error } = await supabase
@@ -50,136 +37,80 @@ export default function HomePage() {
           id,
           nombre_original,
           precio,
-          fecha_actualizacion,
-          proveedores ( nombre, contacto, telefono )
+          catalogo_maestro ( nombre_estandarizado )
         `)
-        .eq('catalogo_id', prod.id)
-        .order('precio', { ascending: true });
+        .eq('proveedor_id', prov.id);
 
       if (error) throw error;
-      setComparativa(data || []);
+      setProductosProveedor(data || []);
     } catch (err) {
-      console.error('Error cargando comparativa:', err);
-    } finally {
-      setCargandoComparativa(false);
+      console.error('Error cargando productos del proveedor:', err);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Encabezado Superior */}
-      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Estandarizador & Comparador de Precios</h1>
-          <p className="text-xs text-gray-500">Gestión centralizada de compras y proveedores</p>
-        </div>
-
-        <div className="flex gap-3">
-          <Link
-            href="/proveedores"
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition"
-          >
-            Ver Proveedores
-          </Link>
-          <Link
-            href="/cargar"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition"
-          >
-            + Cargar Lista de Precios
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Directorio de Proveedores</h1>
+            <p className="text-sm text-gray-500">Consulta los artículos cargados por cada proveedor</p>
+          </div>
+          <Link href="/" className="text-sm font-medium text-blue-600 hover:underline">
+            ← Volver al Comparador
           </Link>
         </div>
-      </header>
 
-      {/* Cuerpo Dividido */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Panel Izquierdo: Lista de Productos */}
-        <aside className="w-1/3 border-r bg-white overflow-y-auto p-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-            Artículos Estandarizados ({productos.length})
-          </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Lista de Proveedores */}
+          <div className="space-y-3">
+            {proveedores.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => cargarProductosProveedor(p)}
+                className={`w-full text-left p-4 rounded-lg border bg-white transition ${
+                  proveedorSeleccionado?.id === p.id ? 'border-blue-500 ring-2 ring-blue-100' : 'hover:bg-gray-50'
+                }`}
+              >
+                <h3 className="font-bold text-gray-800">{p.nombre}</h3>
+                <p className="text-xs text-gray-500">{p.contacto || 'Sin contacto'}</p>
+                <p className="text-xs text-gray-400 mt-1">{p.telefono}</p>
+              </button>
+            ))}
+          </div>
 
-          {cargandoLista ? (
-            <p className="text-gray-400 text-sm">Cargando catálogo...</p>
-          ) : (
-            <div className="space-y-2">
-              {productos.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => seleccionarProducto(item)}
-                  className={`w-full text-left p-3 rounded-lg border transition ${
-                    productoSeleccionado?.id === item.id
-                      ? 'border-blue-500 bg-blue-50 text-blue-900 font-medium'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{item.nombre_estandarizado}</p>
-                  <span className="inline-block text-xs text-gray-500 mt-1">
-                    Categoría: {item.categoria || 'General'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </aside>
+          {/* Lista de Productos del Proveedor */}
+          <div className="md:col-span-2 bg-white border rounded-lg p-6 shadow-sm">
+            {proveedorSeleccionado ? (
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 mb-1">{proveedorSeleccionado.nombre}</h2>
+                <p className="text-xs text-gray-500 mb-6">Lista de productos registrados</p>
 
-        {/* Panel Derecho: Comparativa de Precios */}
-        <main className="flex-1 bg-gray-50 overflow-y-auto p-8">
-          {productoSeleccionado ? (
-            <div>
-              <div className="mb-6 bg-white p-6 rounded-lg border shadow-sm">
-                <span className="text-xs font-semibold text-blue-600 uppercase">Artículo Seleccionado</span>
-                <h2 className="text-2xl font-bold text-gray-800">{productoSeleccionado.nombre_estandarizado}</h2>
+                {productosProveedor.length === 0 ? (
+                  <p className="text-gray-400 text-sm">Este proveedor no tiene productos registrados.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {productosProveedor.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{item.nombre_original}</p>
+                          <span className="text-xs text-blue-600">
+                            Estandarizado como: {item.catalogo_maestro?.nombre_estandarizado || 'Sin mapear'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-gray-900">
+                          ${Number(item.precio).toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">Comparativa de Proveedores</h3>
-
-              {cargandoComparativa ? (
-                <p className="text-gray-400 text-sm">Cargando precios comparativos...</p>
-              ) : comparativa.length === 0 ? (
-                <div className="bg-white p-8 text-center rounded-lg border text-gray-500">
-                  No hay precios vinculados a este producto.
-                </div>
-              ) : (
-                <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
-                        <th className="p-4">Proveedor</th>
-                        <th className="p-4">Nombre en Lista del Proveedor</th>
-                        <th className="p-4 text-right">Precio Registrado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y text-sm">
-                      {comparativa.map((fila, idx) => (
-                        <tr key={fila.id} className={idx === 0 ? 'bg-green-50/50 font-medium' : ''}>
-                          <td className="p-4">
-                            <p className="font-semibold text-gray-800">
-                              {fila.proveedores?.nombre || 'Proveedor Desconocido'}
-                            </p>
-                            <span className="text-xs text-gray-500">{fila.proveedores?.telefono}</span>
-                          </td>
-                          <td className="p-4 text-gray-600">{fila.nombre_original}</td>
-                          <td className="p-4 text-right font-bold text-gray-900">
-                            ${Number(fila.precio).toLocaleString('es-CO')}
-                            {idx === 0 && (
-                              <span className="block text-xs font-normal text-green-600">
-                                Mejor Precio
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center text-gray-400">
-              Selecciona un producto de la izquierda para comparar precios.
-            </div>
-          )}
-        </main>
+            ) : (
+              <p className="text-gray-400 text-center">Selecciona un proveedor.</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
