@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '../../lib/supabase';
 
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState<any[]>([]);
@@ -13,7 +14,6 @@ export default function ProveedoresPage() {
   useEffect(() => {
     async function obtenerProveedores() {
       try {
-        const { supabase } = await import('../../lib/supabase');
         const { data, error } = await supabase.from('proveedores').select('*').order('nombre');
         if (error) throw error;
         setProveedores(data || []);
@@ -30,7 +30,6 @@ export default function ProveedoresPage() {
   const cargarProductosProveedor = async (prov: any) => {
     setProveedorSeleccionado(prov);
     try {
-      const { supabase } = await import('../../lib/supabase');
       const { data, error } = await supabase
         .from('lista_precios')
         .select(`
@@ -62,6 +61,7 @@ export default function ProveedoresPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Lista de Proveedores */}
           <div className="space-y-3">
             {proveedores.map((p) => (
               <button
@@ -78,6 +78,7 @@ export default function ProveedoresPage() {
             ))}
           </div>
 
+          {/* Lista de Productos del Proveedor */}
           <div className="md:col-span-2 bg-white border rounded-lg p-6 shadow-sm">
             {proveedorSeleccionado ? (
               <div>
