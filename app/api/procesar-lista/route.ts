@@ -80,21 +80,23 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. ESTRATEGIA DE REINTENTO EXCLUSIVA CON MODELOS VALIDADOS
+    // 3. REINTENTOS CON EXPONENTIAL BACKOFF ÚNICAMENTE SOBRE MODELO OFICIAL 'gemini-3.8-flash'
     let responseText = '';
-    const modelosValidos = ['gemini-3.8-flash', 'gemini-1.5-flash-latest'];
+    const maxReintentos = 3;
     let ultimoError: any = null;
 
-    for (const nombreModelo of modelosValidos) {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+
+    for (let i = 0; i < maxReintentos; i++) {
       try {
-        const model = genAI.getGenerativeModel({ model: nombreModelo });
         const result = await model.generateContent(partesPrompt);
         responseText = result.response.text();
         if (responseText) break;
       } catch (err: any) {
-        console.warn(`Error con ${nombreModelo}, reintentando en 1.5s...`, err);
+        console.warn(`Intento ${i + 1} falló en gemini-3.8-flash. Reintentando...`, err);
         ultimoError = err;
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        // Espera incremental: 2s, 4s, 6s...
+        await new Promise((resolve) => setTimeout(resolve, (i + 1) * 2000));
       }
     }
 
@@ -102,7 +104,7 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
       throw (
         ultimoError ||
         new Error(
-          'La API sobrepasó el límite de peticiones por minuto. Espera 20 segundos y vuelve a intentar.'
+          'El servidor de Google está experimentando alta demanda. Espera 15 segundos e intenta de nuevo.'
         )
       );
     }
