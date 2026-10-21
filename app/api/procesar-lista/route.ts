@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     let parts: any[] = [];
 
-    // 1. PROCESAMIENTO DE ARCHIVO
+    // 1. EXTRAER CONTENIDO DEL ARCHIVO (Excel, PDF, Imagen, TXT)
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. INSTRUCCIONES
+    // 2. INSTRUCCIONES DE ESTANDARIZACIÓN
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -82,8 +82,8 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     parts.push({ text: instrucciones });
 
-    // 3. PETICIÓN DIRECTA POR HTTP REST (Sin depender de librerías intermedias)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    // 3. PETICIÓN HTTP DIRECTA AL MODELO gemini-3.8-flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
     const res = await fetch(url, {
       method: 'POST',
