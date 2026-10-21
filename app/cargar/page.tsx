@@ -50,7 +50,7 @@ export default function CargarListaPage() {
   };
 
   const handleGuardar = async () => {
-    setMensaje('Guardando en Supabase...');
+    setMensaje('Guardando en la base de datos...');
     for (const item of itemsProcesados) {
       let catId = item.catalogo_id;
       if (!catId) {
@@ -69,68 +69,135 @@ export default function CargarListaPage() {
         }]);
       }
     }
-    setMensaje('¡Guardado con éxito!');
+    setMensaje('¡Precios actualizados exitosamente!');
     setItemsProcesados([]);
     setTextoLista('');
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6 text-black">
-      <h1 className="text-2xl font-bold">1. Cargar Lista de Proveedor</h1>
-      
-      {/* Crear proveedor rapido */}
-      <div className="flex gap-2 border p-3 rounded bg-gray-50">
-        <input
-          type="text"
-          placeholder="¿Proveedor nuevo? Escribe el nombre..."
-          value={nuevoProveedor}
-          onChange={(e) => setNuevoProveedor(e.target.value)}
-          className="border p-2 rounded flex-1"
-        />
-        <button onClick={handleCrearProveedor} className="bg-gray-800 text-white px-4 py-2 rounded">
-          + Agregar Proveedor
+    <div className="space-y-8 max-w-4xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Cargar Lista de Proveedor</h1>
+        <p className="text-slate-500 mt-1">Pega el texto crudo enviado por tu proveedor para extraer y estandarizar precios automáticamente.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
+        {/* Proveedor selector / creador */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              1. Seleccionar Proveedor
+            </label>
+            <select 
+              value={proveedorSeleccionado} 
+              onChange={(e) => setProveedorSeleccionado(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 text-slate-900 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            >
+              <option value="">-- Elige un proveedor --</option>
+              {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              O Crear un Nuevo Proveedor
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Nombre del proveedor..."
+                value={nuevoProveedor}
+                onChange={(e) => setNuevoProveedor(e.target.value)}
+                className="flex-1 bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <button 
+                onClick={handleCrearProveedor} 
+                className="bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-3 rounded-xl transition-all"
+              >
+                + Crear
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Textarea */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            2. Contenido de la Lista
+          </label>
+          <textarea
+            rows={6}
+            value={textoLista}
+            onChange={(e) => setTextoLista(e.target.value)}
+            placeholder="Pega la lista del proveedor en texto (ej. Vaso 7oz blanco x 100u $12.500)..."
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-4 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-sm"
+          />
+        </div>
+
+        <button 
+          onClick={handleProcesar} 
+          disabled={cargandoIA} 
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {cargandoIA ? (
+            <span>✨ Gemini está procesando la lista...</span>
+          ) : (
+            <span>⚡ Procesar Lista con Inteligencia Artificial</span>
+          )}
         </button>
       </div>
 
-      {/* Seleccionar Proveedor */}
-      <select 
-        value={proveedorSeleccionado} 
-        onChange={(e) => setProveedorSeleccionado(e.target.value)}
-        className="w-full border p-2 rounded"
-      >
-        <option value="">-- Selecciona Proveedor Existente --</option>
-        {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-      </select>
-
-      {/* Texto de la lista */}
-      <textarea
-        rows={6}
-        value={textoLista}
-        onChange={(e) => setTextoLista(e.target.value)}
-        placeholder="Pega aquí la lista enviada por el proveedor..."
-        className="w-full border p-2 rounded"
-      />
-
-      <button onClick={handleProcesar} disabled={cargandoIA} className="bg-blue-600 text-white px-4 py-2 rounded w-full font-bold">
-        {cargandoIA ? 'Procesando con IA...' : 'Procesar Lista con IA'}
-      </button>
-
-      {/* Revision Humana */}
+      {/* Tabla de Validación Humana */}
       {itemsProcesados.length > 0 && (
-        <div className="space-y-4 border-t pt-4">
-          <h2 className="text-xl font-semibold">Validación Humana</h2>
-          {itemsProcesados.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center border p-2 rounded bg-white">
-              <span>{item.nombre_original}</span>
-              <span className="font-bold text-green-700">${item.precio}</span>
-            </div>
-          ))}
-          <button onClick={handleGuardar} className="bg-green-600 text-white px-4 py-2 rounded w-full font-bold text-lg">
-            Confirmar y Guardar en Base de Datos
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800">3. Validación y Estandarización Sugerida</h2>
+            <span className="bg-blue-50 text-blue-700 font-semibold text-xs px-3 py-1 rounded-full border border-blue-100">
+              {itemsProcesados.length} Productos detectados
+            </span>
+          </div>
+
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 text-xs uppercase font-semibold border-b border-slate-200">
+                  <th className="p-4">Nombre Original</th>
+                  <th className="p-4">Sugerencia Estándar</th>
+                  <th className="p-4 text-right">Precio Detectado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {itemsProcesados.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 font-medium text-slate-800">{item.nombre_original}</td>
+                    <td className="p-4 text-slate-600">
+                      <span className="inline-block bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-medium">
+                        {item.nombre_estandarizado_sugerido}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right font-bold text-emerald-600 font-mono">
+                      ${Number(item.precio).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <button 
+            onClick={handleGuardar} 
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-emerald-500/20 transition-all"
+          >
+            ✓ Confirmar y Guardar en Supabase
           </button>
         </div>
       )}
-      {mensaje && <p className="text-green-600 font-bold text-center">{mensaje}</p>}
+
+      {mensaje && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl font-medium text-center">
+          {mensaje}
+        </div>
+      )}
     </div>
   );
 }
