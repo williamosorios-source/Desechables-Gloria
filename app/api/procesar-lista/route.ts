@@ -24,9 +24,8 @@ export async function POST(req: Request) {
 
     let partesPrompt: any[] = [];
 
-    // 1. PROCESAMIENTO Y LECTURA SEGÚN EL TIPO DE ARCHIVO
+    // 1. LECTURA SEGÚN EL TIPO DE ARCHIVO (PDF, Imagen, Excel, TXT)
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-      // Procesa hojas de cálculo convirtiéndolas a texto plano CSV
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
       workbook.SheetNames.forEach((sheetName) => {
@@ -41,7 +40,6 @@ export async function POST(req: Request) {
       mimeType.startsWith('image/') ||
       mimeType === 'application/pdf'
     ) {
-      // Envío de binarios directamente (PDFs o Imágenes PNG/JPG)
       partesPrompt.push({
         inlineData: {
           data: buffer.toString('base64'),
@@ -49,13 +47,12 @@ export async function POST(req: Request) {
         },
       });
     } else {
-      // Para archivos de texto plano (.txt, .csv)
       partesPrompt.push(
         `TEXTO DEL DOCUMENTO:\n"""\n${buffer.toString('utf-8')}\n"""`
       );
     }
 
-    // 2. PROMPT CON REGLAS Y ESTRUCTURA DE SALIDA JSON
+    // 2. PROMPT DE EXTRACTION Y ESTANDARIZACIÓN
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -83,13 +80,12 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     partesPrompt.push(instrucciones);
 
-    // 3. ESTRATEGIA DE REINTENTO Y FALLBACK ANTE SATURACIÓN DE MODELOS
+    // 3. ESTRATEGIA DE FALLBACK CON ALIAS DINÁMICOS COMPATIBLES
     let result = null;
     const listaModelos = [
-      'gemini-1.5-flash',
+      'gemini-flash-latest',
+      'gemini-pro-latest',
       'gemini-2.5-flash',
-      'gemini-3.8-flash',
-      'gemini-1.5-pro',
     ];
     let ultimoError = null;
 
@@ -97,10 +93,10 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
       try {
         const model = genAI.getGenerativeModel({ model: nombreModelo });
         result = await model.generateContent(partesPrompt);
-        if (result) break; // Si responde con éxito, salimos del bucle
+        if (result) break;
       } catch (err: any) {
         console.warn(
-          `El modelo ${nombreModelo} presentó fallos o alta demanda. Reintentando con siguiente modelo...`
+          `El modelo ${nombreModelo} no respondió. Probando siguiente alias...`
         );
         ultimoError = err;
       }
@@ -110,12 +106,12 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
       throw (
         ultimoError ||
         new Error(
-          'Los modelos de procesamiento están experimentando alta demanda. Intenta nuevamente en unos instantes.'
+          'Los modelos de procesamientos están experimentando alta demanda. Intenta de nuevo en un par de segundos.'
         )
       );
     }
 
-    // 4. LIMPIEZA Y DEVOLUCIÓN DE LA RESPUESTA
+    // 4. LIMPIEZA DEL JSON RESULTANTE
     const responseText = result.response.text();
     const jsonLimpio = responseText
       .replace(/```json/g, '')
