@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '../lib/supabase';
 
 export default function HomePage() {
   const [productos, setProductos] = useState<any[]>([]);
@@ -12,10 +13,10 @@ export default function HomePage() {
   const [cargandoLista, setCargandoLista] = useState(true);
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
 
+  // Cargar catálogo estandarizado desde Supabase
   useEffect(() => {
     async function obtenerCatalogo() {
       try {
-        const { supabase } = await import('../lib/supabase');
         const { data, error } = await supabase
           .from('catalogo_maestro')
           .select('*')
@@ -36,12 +37,12 @@ export default function HomePage() {
     obtenerCatalogo();
   }, []);
 
+  // Cargar comparativa de precios por proveedor para el producto seleccionado
   const seleccionarProducto = async (prod: any) => {
     setProductoSeleccionado(prod);
     setCargandoComparativa(true);
 
     try {
-      const { supabase } = await import('../lib/supabase');
       const { data, error } = await supabase
         .from('lista_precios')
         .select(`
@@ -65,6 +66,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header Superior */}
       <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Estandarizador & Comparador de Precios</h1>
@@ -87,7 +89,9 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* Cuerpo Layout Dividido */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Panel Izquierdo: Lista de Productos */}
         <aside className="w-1/3 border-r bg-white overflow-y-auto p-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             Artículos Estandarizados ({productos.length})
@@ -117,6 +121,7 @@ export default function HomePage() {
           )}
         </aside>
 
+        {/* Panel Derecho: Comparativa */}
         <main className="flex-1 bg-gray-50 overflow-y-auto p-8">
           {productoSeleccionado ? (
             <div>
