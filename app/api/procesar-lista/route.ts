@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     let parts: any[] = [];
 
-    // 1. EXTRAER CONTENIDO DEL ARCHIVO (Excel, PDF, Imagen, TXT)
+    // 1. Extraer contenido según el tipo de archivo
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       let contenidoExcel = '';
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. INSTRUCCIONES DE ESTANDARIZACIÓN
+    // 2. Instrucciones de estandarización
     const instrucciones = `
 Analiza la lista de productos y precios adjunta en este documento o imagen.
 
@@ -82,7 +82,7 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     parts.push({ text: instrucciones });
 
-    // 3. PETICIÓN HTTP DIRECTA A GEMINI 3.8 FLASH
+    // 3. Petición HTTP directa a Gemini 3.8 Flash
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
     const res = await fetch(url, {
@@ -97,7 +97,6 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
 
     const data = await res.json();
 
-    // Captura limpia de error por saturación (503 / 429) o cualquier fallo de la API
     if (!res.ok) {
       if (res.status === 503 || res.status === 429) {
         return NextResponse.json(
@@ -121,7 +120,7 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin formato markdown ni bloques
       );
     }
 
-    // 4. PARSEO DEL JSON
+    // 4. Parseo y limpieza del JSON
     const jsonLimpio = responseText
       .replace(/```json/g, '')
       .replace(/```/g, '')
