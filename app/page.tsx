@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase'; // Asegúrate de tener este archivo configurado
 
 export default function HomePage() {
   const [productos, setProductos] = useState<any[]>([]);
@@ -13,10 +12,11 @@ export default function HomePage() {
   const [cargandoLista, setCargandoLista] = useState(true);
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
 
-  // 1. Cargar el catálogo de productos estandarizados
+  // Cargar catálogo maestro desde Supabase al montar la página
   useEffect(() => {
     async function obtenerCatalogo() {
       try {
+        const { supabase } = await import('@/lib/supabase');
         const { data, error } = await supabase
           .from('catalogo_maestro')
           .select('*')
@@ -26,7 +26,7 @@ export default function HomePage() {
 
         setProductos(data || []);
         if (data && data.length > 0) {
-          seleccionarProducto(data[0]); // Seleccionar el primero por defecto
+          seleccionarProducto(data[0]);
         }
       } catch (err) {
         console.error('Error cargando catálogo:', err);
@@ -37,12 +37,13 @@ export default function HomePage() {
     obtenerCatalogo();
   }, []);
 
-  // 2. Cargar comparativa de precios por proveedor al hacer clic en un producto
+  // Cargar comparativa de precios por proveedor al seleccionar un producto
   const seleccionarProducto = async (prod: any) => {
     setProductoSeleccionado(prod);
     setCargandoComparativa(true);
 
     try {
+      const { supabase } = await import('@/lib/supabase');
       const { data, error } = await supabase
         .from('lista_precios')
         .select(`
@@ -66,7 +67,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Encabezado Principal */}
+      {/* Encabezado Superior */}
       <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Estandarizador & Comparador de Precios</h1>
@@ -89,7 +90,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Cuerpo Principal Dividido */}
+      {/* Cuerpo Dividido */}
       <div className="flex-1 flex overflow-hidden">
         {/* Panel Izquierdo: Lista de Productos */}
         <aside className="w-1/3 border-r bg-white overflow-y-auto p-4">
@@ -113,7 +114,7 @@ export default function HomePage() {
                 >
                   <p className="text-sm font-semibold">{item.nombre_estandarizado}</p>
                   <span className="inline-block text-xs text-gray-500 mt-1">
-                    {item.categoria || 'Sin categoría'} • {item.unidad_medida || 'U.M. global'}
+                    Categoría: {item.categoria || 'General'}
                   </span>
                 </button>
               ))}
@@ -162,7 +163,7 @@ export default function HomePage() {
                             ${Number(fila.precio).toLocaleString('es-CO')}
                             {idx === 0 && (
                               <span className="block text-xs font-normal text-green-600">
-                                Mejol Precio
+                                Mejor Precio
                               </span>
                             )}
                           </td>
