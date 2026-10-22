@@ -68,7 +68,7 @@ export default function HomePage() {
       {/* Encabezado Superior */}
       <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Desechables Gloria</h1>
+          <h1 className="text-xl font-bold text-gray-800">Mercadeo Institucional</h1>
           <p className="text-xs text-gray-500">Gestión centralizada de compras y proveedores</p>
         </div>
 
