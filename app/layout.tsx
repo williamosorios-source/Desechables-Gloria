@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import './globals.css'; // <-- ESTA LÍNEA ES INDISPENSABLE
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Cotizador & Comparador Inteligente',
@@ -17,28 +17,17 @@ export default function RootLayout({
       <body className="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans antialiased">
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
           <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3">
               <div className="bg-blue-600 text-white p-2 rounded-xl font-bold text-lg shadow-blue-200 shadow-md">
                 📊
               </div>
               <span className="font-bold text-slate-800 text-lg tracking-tight">
                 PriceMatch <span className="text-blue-600 font-normal">AI</span>
               </span>
-            </div>
+            </Link>
             
             <nav className="flex gap-2">
-              <Link
-                href="/cargar"
-                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-all"
-              >
-                1. Cargar Listas
-              </Link>
-              <Link
-                href="/comparador"
-                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-all"
-              >
-                2. Comparador
-              </Link>
+              {/* Opciones de navegación limpias */}
             </nav>
           </div>
         </header>
