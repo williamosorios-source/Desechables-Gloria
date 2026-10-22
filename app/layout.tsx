@@ -22,7 +22,7 @@ export default function RootLayout({
                 📊
               </div>
               <span className="font-bold text-slate-800 text-lg tracking-tight">
-                Mercadeo Institucional <span className="text-blue-600 font-normal">Proveedores</span>
+                Cotizador & Comparador <span className="text-blue-600 font-normal">Proveedores</span>
               </span>
             </Link>
             
