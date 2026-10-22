@@ -198,7 +198,6 @@ export default function CargarPage() {
         proveedor_id: idProvFinal,
         nombre_proveedor: nombreProvFinal,
         nombre_original: item.nombre_original,
-        nombre_estandarizado: item.nombre_original,
         precio: item.precio
       }));
 
@@ -254,7 +253,7 @@ export default function CargarPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Encabezado */}
+      {/* Encabezado con Botones de Navegación */}
       <header className="bg-white border-b px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div>
           <h1 className="text-lg md:text-xl font-bold text-gray-800">Mercadeo Institucional</h1>
@@ -273,6 +272,12 @@ export default function CargarPage() {
             className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs md:text-sm font-medium rounded-lg transition"
           >
             Ver Proveedores
+          </Link>
+          <Link
+            href="/estandarizar"
+            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm font-medium rounded-lg transition"
+          >
+            ⚙️ Estandarizar
           </Link>
         </div>
       </header>
