@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabase';
 
@@ -13,6 +13,8 @@ export default function HomePage() {
   const [comparativa, setComparativa] = useState<any[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
+
+  const detalleRef = useRef<HTMLDivElement>(null);
 
   // 1. Cargar el catálogo maestro estandarizado
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function HomePage() {
         setProductos(lista);
 
         if (lista.length > 0) {
-          seleccionarProducto(lista[0]);
+          seleccionarProducto(lista[0], false);
         }
       } catch (err) {
         console.error('Error al cargar catálogo:', err);
@@ -41,7 +43,7 @@ export default function HomePage() {
     obtenerCatalogo();
   }, []);
 
-  // 2. Filtrar productos en tiempo real según lo ingresado en el buscador
+  // 2. Filtrar productos en tiempo real según el buscador
   const productosFiltrados = useMemo(() => {
     if (!busqueda.trim()) return productos;
     return productos.filter((item) =>
@@ -50,7 +52,7 @@ export default function HomePage() {
   }, [productos, busqueda]);
 
   // 3. Cargar precios comparativos filtrando por catalogo_id
-  const seleccionarProducto = async (prod: any) => {
+  const seleccionarProducto = async (prod: any, hacerScrollMovil = true) => {
     if (!prod || !prod.id) return;
     setProductoSeleccionado(prod);
     setCargandoComparativa(true);
@@ -64,6 +66,11 @@ export default function HomePage() {
 
       if (error) throw error;
       setComparativa(data || []);
+
+      // Si es un celular y el usuario hizo clic, desplaza automáticamente a la tabla de precios
+      if (hacerScrollMovil && window.innerWidth < 768 && detalleRef.current) {
+        detalleRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     } catch (err) {
       console.error('Error cargando precios:', err);
       setComparativa([]);
@@ -73,37 +80,37 @@ export default function HomePage() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-gray-50 flex flex-col overflow-hidden">
-      {/* Encabezado Superior */}
-      <header className="bg-white border-b px-8 py-4 flex justify-between items-center shrink-0 shadow-sm">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Desechables Gloria</h1>
+    <div className="min-h-screen md:h-[calc(100vh-4rem)] bg-gray-50 flex flex-col overflow-x-hidden md:overflow-hidden">
+      {/* Encabezado Superior Responsivo */}
+      <header className="bg-white border-b px-4 md:px-8 py-3 md:py-4 flex flex-col sm:flex-row justify-between items-center shrink-0 shadow-sm gap-3">
+        <div className="text-center sm:text-left">
+          <h1 className="text-lg md:text-xl font-bold text-gray-800">Mercadeo Institucional</h1>
           <p className="text-xs text-gray-500">Gestión centralizada de compras y proveedores</p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 w-full sm:w-auto justify-center">
           <Link
             href="/proveedores"
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition"
+            className="flex-1 sm:flex-initial text-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs md:text-sm font-medium rounded-lg transition"
           >
             Ver Proveedores
           </Link>
           <Link
             href="/cargar"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition"
+            className="flex-1 sm:flex-initial text-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-medium rounded-lg transition"
           >
-            + Cargar Lista de Precios
+            + Cargar Lista
           </Link>
         </div>
       </header>
 
-      {/* Cuerpo Dividido con Scroll Independiente */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Cuerpo Dividido (Apilado en móvil, 2 columnas en desktop) */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
         {/* Panel Izquierdo: Catálogo Maestro con Buscador y Scroll Propio */}
-        <aside className="w-1/3 border-r bg-white flex flex-col h-full">
-          {/* Cabecera Fija del Panel Izquierdo */}
-          <div className="p-4 border-b shrink-0 bg-white">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <aside className="w-full md:w-1/3 border-b md:border-b-0 md:border-r bg-white flex flex-col max-h-[50vh] md:max-h-none md:h-full shrink-0">
+          {/* Cabecera Fija del Panel */}
+          <div className="p-3 md:p-4 border-b shrink-0 bg-white">
+            <h2 className="text-xs md:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 md:mb-3">
               Artículos Estandarizados ({productosFiltrados.length})
             </h2>
 
@@ -114,7 +121,7 @@ export default function HomePage() {
                 placeholder="🔍 Buscar producto..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full pl-3 pr-8 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                className="w-full pl-3 pr-8 py-2 text-xs md:text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
               />
               {busqueda && (
                 <button
@@ -128,11 +135,11 @@ export default function HomePage() {
           </div>
 
           {/* Lista Scrolleable Independiente */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-2">
             {cargandoLista ? (
-              <p className="text-gray-400 text-sm">Cargando catálogo...</p>
+              <p className="text-gray-400 text-xs md:text-sm">Cargando catálogo...</p>
             ) : productosFiltrados.length === 0 ? (
-              <p className="text-gray-500 text-sm py-4 text-center">
+              <p className="text-gray-500 text-xs md:text-sm py-4 text-center">
                 No se encontraron productos coincidentes.
               </p>
             ) : (
@@ -146,55 +153,57 @@ export default function HomePage() {
                       : 'border-gray-200 hover:bg-gray-50 text-gray-700'
                   }`}
                 >
-                  <p className="text-sm font-semibold">{item.nombre_estandarizado}</p>
+                  <p className="text-xs md:text-sm font-semibold">{item.nombre_estandarizado}</p>
                 </button>
               ))
             )}
           </div>
         </aside>
 
-        {/* Panel Derecho: Tabla Comparativa de Precios con Scroll Propio */}
-        <main className="flex-1 bg-gray-50 overflow-y-auto p-8 h-full">
+        {/* Panel Derecho: Tabla Comparativa de Precios */}
+        <main ref={detalleRef} className="flex-1 bg-gray-50 overflow-y-auto p-4 md:p-8 md:h-full">
           {productoSeleccionado ? (
             <div>
-              <div className="mb-6 bg-white p-6 rounded-lg border shadow-sm">
-                <span className="text-xs font-semibold text-blue-600 uppercase">
+              <div className="mb-4 md:mb-6 bg-white p-4 md:p-6 rounded-lg border shadow-sm">
+                <span className="text-[10px] md:text-xs font-semibold text-blue-600 uppercase">
                   Artículo Estandarizado Seleccionado
                 </span>
-                <h2 className="text-2xl font-bold text-gray-800">
+                <h2 className="text-lg md:text-2xl font-bold text-gray-800">
                   {productoSeleccionado.nombre_estandarizado}
                 </h2>
               </div>
 
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">Comparativa de Precios</h3>
+              <h3 className="text-sm md:text-lg font-semibold text-gray-700 mb-3 md:mb-4">
+                Comparativa de Precios
+              </h3>
 
               {cargandoComparativa ? (
-                <p className="text-gray-400 text-sm">Cargando precios comparativos...</p>
+                <p className="text-gray-400 text-xs md:text-sm">Cargando precios comparativos...</p>
               ) : comparativa.length === 0 ? (
-                <div className="bg-white p-8 text-center rounded-lg border text-gray-500">
+                <div className="bg-white p-6 md:p-8 text-center rounded-lg border text-gray-500 text-xs md:text-sm">
                   No hay precios registrados para este producto.
                 </div>
               ) : (
-                <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-                  <table className="w-full text-left border-collapse">
+                <div className="bg-white rounded-lg border shadow-sm overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[500px] md:min-w-0">
                     <thead>
-                      <tr className="bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
-                        <th className="p-4">Proveedor</th>
-                        <th className="p-4">Nombre Original en Lista</th>
-                        <th className="p-4 text-right">Precio Registrado</th>
+                      <tr className="bg-gray-100 border-b text-[10px] md:text-xs font-semibold text-gray-600 uppercase">
+                        <th className="p-3 md:p-4">Proveedor</th>
+                        <th className="p-3 md:p-4">Nombre Original en Lista</th>
+                        <th className="p-3 md:p-4 text-right">Precio Registrado</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y text-sm">
+                    <tbody className="divide-y text-xs md:text-sm">
                       {comparativa.map((fila, idx) => (
                         <tr key={fila.id} className={idx === 0 ? 'bg-green-50/50 font-medium' : ''}>
-                          <td className="p-4 font-semibold text-gray-800">
+                          <td className="p-3 md:p-4 font-semibold text-gray-800">
                             {fila.nombre_proveedor}
                           </td>
-                          <td className="p-4 text-gray-600">{fila.nombre_original}</td>
-                          <td className="p-4 text-right font-bold text-gray-900">
+                          <td className="p-3 md:p-4 text-gray-600">{fila.nombre_original}</td>
+                          <td className="p-3 md:p-4 text-right font-bold text-gray-900">
                             ${Number(fila.precio).toLocaleString('es-CO')}
                             {idx === 0 && (
-                              <span className="block text-xs font-normal text-green-600">
+                              <span className="block text-[10px] md:text-xs font-normal text-green-600">
                                 Mejor Precio
                               </span>
                             )}
@@ -207,8 +216,8 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center text-gray-400">
-              Selecciona un producto de la izquierda para ver los precios.
+            <div className="flex h-full items-center justify-center text-gray-400 py-12 text-xs md:text-sm">
+              Selecciona un producto de la lista para ver sus precios.
             </div>
           )}
         </main>
