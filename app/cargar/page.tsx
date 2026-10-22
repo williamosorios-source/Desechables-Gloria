@@ -24,6 +24,7 @@ export default function CargarPage() {
   const [precioManual, setPrecioManual] = useState('');
 
   const [cargandoProveedores, setCargandoProveedores] = useState(true);
+  const [guardandoProveedorSolo, setGuardandoProveedorSolo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [eliminandoTodo, setEliminandoTodo] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
@@ -55,6 +56,38 @@ export default function CargarPage() {
     }
   }
 
+  // Guardar SOLAMENTE el nuevo proveedor en la Base de Datos
+  const guardarSoloProveedor = async () => {
+    setMensaje(null);
+    if (!nuevoProveedorNombre.trim()) {
+      setMensaje({ tipo: 'error', texto: 'Escribe el nombre del nuevo proveedor.' });
+      return;
+    }
+
+    setGuardandoProveedorSolo(true);
+
+    try {
+      const { data: newProv, error } = await supabase
+        .from('proveedores')
+        .insert({ nombre: nuevoProveedorNombre.trim() })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMensaje({ tipo: 'exito', texto: `¡Proveedor "${newProv.nombre}" creado con éxito!` });
+      setNuevoProveedorNombre('');
+      setModoCrearProveedor(false);
+      await obtenerProveedores();
+      setProveedorId(newProv.id);
+    } catch (err: any) {
+      console.error(err);
+      setMensaje({ tipo: 'error', texto: err.message || 'Error al guardar el proveedor.' });
+    } finally {
+      setGuardandoProveedorSolo(false);
+    }
+  };
+
   // 2. Procesar archivo Excel / CSV
   const manejarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,7 +108,6 @@ export default function CargarPage() {
         }
 
         const nuevosItems: ItemCarga[] = dataJson.map((row, index) => {
-          // Detectar columnas de forma flexible (mayúsculas, minúsculas, etc.)
           const keys = Object.keys(row);
           const keyNombre = keys.find(k => /nombre|producto|articulo|descripcion/i.test(k)) || keys[0];
           const keyPrecio = keys.find(k => /precio|costo|valor/i.test(k)) || keys[1];
@@ -142,7 +174,6 @@ export default function CargarPage() {
       let idProvFinal = proveedorId;
       let nombreProvFinal = '';
 
-      // A. Crear proveedor si está en modo creación
       if (modoCrearProveedor) {
         if (!nuevoProveedorNombre.trim()) {
           throw new Error('Ingresa el nombre del nuevo proveedor.');
@@ -163,12 +194,11 @@ export default function CargarPage() {
         nombreProvFinal = provEncontrado.nombre;
       }
 
-      // B. Preparar inserción masiva en lista_precios
       const registrosAInsertar = items.map(item => ({
         proveedor_id: idProvFinal,
         nombre_proveedor: nombreProvFinal,
         nombre_original: item.nombre_original,
-        nombre_estandarizado: item.nombre_original, // Asignado por defecto hasta estandarizar
+        nombre_estandarizado: item.nombre_original,
         precio: item.precio
       }));
 
@@ -269,7 +299,7 @@ export default function CargarPage() {
             1. Definir Proveedor
           </h2>
 
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
             {!modoCrearProveedor ? (
               <div className="flex-1 w-full">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -289,24 +319,34 @@ export default function CargarPage() {
                 </select>
               </div>
             ) : (
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Nombre del Nuevo Proveedor
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Distribuidora Central S.A.S."
-                  value={nuevoProveedorNombre}
-                  onChange={(e) => setNuevoProveedorNombre(e.target.value)}
-                  className="w-full p-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+              <div className="flex-1 w-full flex flex-col sm:flex-row gap-2 items-end">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Nombre del Nuevo Proveedor
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Distribuidora Central S.A.S."
+                    value={nuevoProveedorNombre}
+                    onChange={(e) => setNuevoProveedorNombre(e.target.value)}
+                    className="w-full p-2.5 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={guardarSoloProveedor}
+                  disabled={guardandoProveedorSolo}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition whitespace-nowrap shadow-sm"
+                >
+                  {guardandoProveedorSolo ? 'Guardando...' : 'Guardar Solo Proveedor'}
+                </button>
               </div>
             )}
 
             <button
               type="button"
               onClick={() => setModoCrearProveedor(!modoCrearProveedor)}
-              className="mt-5 sm:mt-0 px-4 py-2.5 text-xs font-semibold rounded-lg border border-gray-300 hover:bg-gray-100 transition whitespace-nowrap"
+              className="px-4 py-2.5 text-xs font-semibold rounded-lg border border-gray-300 hover:bg-gray-100 transition whitespace-nowrap"
             >
               {modoCrearProveedor ? '← Seleccionar Existente' : '+ Crear Nuevo Proveedor'}
             </button>
