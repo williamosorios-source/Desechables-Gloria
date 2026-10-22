@@ -12,38 +12,47 @@ export default function HomePage() {
   const [comparativa, setComparativa] = useState<any[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
-  const [errorConexion, setErrorConexion] = useState<string | null>(null);
+  const [errorEstado, setErrorEstado] = useState<string | null>(null);
 
   // Cargar catálogo estandarizado desde Supabase
   useEffect(() => {
     async function obtenerCatalogo() {
       try {
-        setErrorConexion(null);
+        setErrorEstado(null);
+
+        if (!supabase) {
+          throw new Error('El cliente de Supabase no está inicializado.');
+        }
+
         const { data, error } = await supabase
           .from('catalogo_maestro')
           .select('*')
           .order('nombre_estandarizado', { ascending: true });
 
         if (error) {
-          throw error;
+          throw new Error(`Supabase Error: ${error.message}`);
         }
 
-        setProductos(data || []);
-        if (data && data.length > 0) {
-          seleccionarProducto(data[0]);
+        const listaProductos = Array.isArray(data) ? data : [];
+        setProductos(listaProductos);
+
+        if (listaProductos.length > 0) {
+          seleccionarProducto(listaProductos[0]);
         }
       } catch (err: any) {
-        console.error('Error cargando catálogo:', err);
-        setErrorConexion(err.message || 'Error al conectar con Supabase');
+        console.error('Error al cargar catálogo:', err);
+        setErrorEstado(err?.message || 'Error al conectar con Supabase.');
       } finally {
         setCargandoLista(false);
       }
     }
+
     obtenerCatalogo();
   }, []);
 
   // Cargar comparativa de precios por proveedor para el producto seleccionado
   const seleccionarProducto = async (prod: any) => {
+    if (!prod || !prod.id) return;
     setProductoSeleccionado(prod);
     setCargandoComparativa(true);
 
@@ -61,8 +70,8 @@ export default function HomePage() {
         .order('precio', { ascending: true });
 
       if (error) throw error;
-      setComparativa(data || []);
-    } catch (err) {
+      setComparativa(Array.isArray(data) ? data : []);
+    } catch (err: any) {
       console.error('Error cargando comparativa:', err);
     } finally {
       setCargandoComparativa(false);
@@ -71,13 +80,14 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header Superior */}
+      {/* Encabezado Principal */}
       <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Estandarizador & Comparador de Precios</h1>
+          <h1 className="text-xl font-bold text-gray-800">Desechables Gloria</h1>
           <p className="text-xs text-gray-500">Gestión centralizada de compras y proveedores</p>
         </div>
 
+        {/* Únicamente los dos botones de navegación requeridos */}
         <div className="flex gap-3">
           <Link
             href="/proveedores"
@@ -94,14 +104,15 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Alerta si falla la base de datos */}
-      {errorConexion && (
-        <div className="bg-red-50 border-b border-red-200 p-4 text-center text-sm text-red-700">
-          <strong>Error de Base de Datos:</strong> {errorConexion}. Verifica las políticas RLS en Supabase o las variables de entorno.
+      {/* Alerta de Error de Conexión */}
+      {errorEstado && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 m-4 text-sm rounded shadow">
+          <p className="font-bold">Error de conexión:</p>
+          <p className="font-mono mt-1">{errorEstado}</p>
         </div>
       )}
 
-      {/* Cuerpo Layout Dividido */}
+      {/* Cuerpo Dividido */}
       <div className="flex-1 flex overflow-hidden">
         {/* Panel Izquierdo: Lista de Productos */}
         <aside className="w-1/3 border-r bg-white overflow-y-auto p-4">
@@ -110,9 +121,13 @@ export default function HomePage() {
           </h2>
 
           {cargandoLista ? (
-            <p className="text-gray-400 text-sm">Cargando catálogo...</p>
+            <div className="p-4 text-gray-400 text-sm animate-pulse">
+              Cargando catálogo maestro...
+            </div>
           ) : productos.length === 0 ? (
-            <p className="text-sm text-gray-500">No hay productos en el catálogo maestro.</p>
+            <div className="p-4 text-gray-500 text-sm border border-dashed rounded">
+              No se encontraron artículos en el catálogo.
+            </div>
           ) : (
             <div className="space-y-2">
               {productos.map((item) => (
@@ -135,7 +150,7 @@ export default function HomePage() {
           )}
         </aside>
 
-        {/* Panel Derecho: Comparativa */}
+        {/* Panel Derecho: Comparativa de Precios */}
         <main className="flex-1 bg-gray-50 overflow-y-auto p-8">
           {productoSeleccionado ? (
             <div>
@@ -150,7 +165,7 @@ export default function HomePage() {
                 <p className="text-gray-400 text-sm">Cargando precios comparativos...</p>
               ) : comparativa.length === 0 ? (
                 <div className="bg-white p-8 text-center rounded-lg border text-gray-500">
-                  No hay precios vinculados a este producto.
+                  No hay precios registrados para este producto.
                 </div>
               ) : (
                 <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
