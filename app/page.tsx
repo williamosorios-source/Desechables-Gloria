@@ -14,7 +14,7 @@ export default function HomePage() {
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
   const [errorEstado, setErrorEstado] = useState<string | null>(null);
 
-  // Cargar catálogo estandarizado desde Supabase
+  // 1. Cargar catálogo maestro desde Supabase
   useEffect(() => {
     async function obtenerCatalogo() {
       try {
@@ -50,7 +50,7 @@ export default function HomePage() {
     obtenerCatalogo();
   }, []);
 
-  // Cargar comparativa de precios por proveedor para el producto seleccionado
+  // 2. Cargar precios comparativos asegurando la búsqueda por UUID
   const seleccionarProducto = async (prod: any) => {
     if (!prod || !prod.id) return;
     setProductoSeleccionado(prod);
@@ -64,7 +64,7 @@ export default function HomePage() {
           nombre_original,
           precio,
           fecha_actualizacion,
-          proveedores ( nombre, contacto, telefono )
+          proveedores!inner ( nombre, contacto, telefono )
         `)
         .eq('catalogo_id', prod.id)
         .order('precio', { ascending: true });
@@ -73,6 +73,7 @@ export default function HomePage() {
       setComparativa(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('Error cargando comparativa:', err);
+      setComparativa([]);
     } finally {
       setCargandoComparativa(false);
     }
@@ -87,7 +88,6 @@ export default function HomePage() {
           <p className="text-xs text-gray-500">Gestión centralizada de compras y proveedores</p>
         </div>
 
-        {/* Únicamente los dos botones de navegación requeridos */}
         <div className="flex gap-3">
           <Link
             href="/proveedores"
