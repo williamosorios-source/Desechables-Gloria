@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '../../lib/supabase'; // Ajusta la ruta a tu lib/supabase si difiere
+import { supabase } from '../../lib/supabase';
 
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState<any[]>([]);
@@ -13,7 +13,7 @@ export default function ProveedoresPage() {
   const [cargandoProveedores, setCargandoProveedores] = useState(true);
   const [cargandoProductos, setCargandoProductos] = useState(false);
 
-  // 1. Cargar lista de proveedores (solo id y nombre)
+  // 1. Cargar proveedores por ID y Nombre
   useEffect(() => {
     async function obtenerProveedores() {
       try {
@@ -40,9 +40,9 @@ export default function ProveedoresPage() {
     obtenerProveedores();
   }, []);
 
-  // 2. Cargar los productos que vende el proveedor seleccionado
+  // 2. Filtrar productos usando la llave foránea proveedor_id
   const seleccionarProveedor = async (prov: any) => {
-    if (!prov) return;
+    if (!prov || !prov.id) return;
     setProveedorSeleccionado(prov);
     setCargandoProductos(true);
 
@@ -50,7 +50,7 @@ export default function ProveedoresPage() {
       const { data, error } = await supabase
         .from('lista_precios')
         .select('id, nombre_estandarizado, nombre_original, precio')
-        .eq('nombre_proveedor', prov.nombre)
+        .eq('proveedor_id', prov.id)
         .order('nombre_estandarizado', { ascending: true });
 
       if (error) throw error;
