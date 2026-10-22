@@ -12,36 +12,26 @@ export default function HomePage() {
   const [comparativa, setComparativa] = useState<any[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
   const [cargandoComparativa, setCargandoComparativa] = useState(false);
-  const [errorEstado, setErrorEstado] = useState<string | null>(null);
 
-  // 1. Cargar catálogo maestro desde Supabase
+  // 1. Cargar el catálogo maestro estandarizado
   useEffect(() => {
     async function obtenerCatalogo() {
       try {
-        setErrorEstado(null);
-
-        if (!supabase) {
-          throw new Error('El cliente de Supabase no está inicializado.');
-        }
-
         const { data, error } = await supabase
           .from('catalogo_maestro')
-          .select('*')
+          .select('id, nombre_estandarizado')
           .order('nombre_estandarizado', { ascending: true });
 
-        if (error) {
-          throw new Error(`Supabase Error: ${error.message}`);
-        }
+        if (error) throw error;
 
-        const listaProductos = Array.isArray(data) ? data : [];
-        setProductos(listaProductos);
+        const lista = data || [];
+        setProductos(lista);
 
-        if (listaProductos.length > 0) {
-          seleccionarProducto(listaProductos[0]);
+        if (lista.length > 0) {
+          seleccionarProducto(lista[0]);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error al cargar catálogo:', err);
-        setErrorEstado(err?.message || 'Error al conectar con Supabase.');
       } finally {
         setCargandoLista(false);
       }
@@ -50,7 +40,7 @@ export default function HomePage() {
     obtenerCatalogo();
   }, []);
 
-  // 2. Cargar precios comparativos asegurando la búsqueda por UUID
+  // 2. Cargar precios comparativos filtrando por catalogo_id
   const seleccionarProducto = async (prod: any) => {
     if (!prod || !prod.id) return;
     setProductoSeleccionado(prod);
@@ -59,20 +49,14 @@ export default function HomePage() {
     try {
       const { data, error } = await supabase
         .from('lista_precios')
-        .select(`
-          id,
-          nombre_original,
-          precio,
-          fecha_actualizacion,
-          proveedores!inner ( nombre, contacto, telefono )
-        `)
+        .select('id, nombre_proveedor, nombre_original, nombre_estandarizado, precio')
         .eq('catalogo_id', prod.id)
         .order('precio', { ascending: true });
 
       if (error) throw error;
-      setComparativa(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      console.error('Error cargando comparativa:', err);
+      setComparativa(data || []);
+    } catch (err) {
+      console.error('Error cargando precios:', err);
       setComparativa([]);
     } finally {
       setCargandoComparativa(false);
@@ -81,7 +65,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Encabezado Principal */}
+      {/* Encabezado Superior */}
       <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Desechables Gloria</h1>
@@ -104,30 +88,18 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Alerta de Error de Conexión */}
-      {errorEstado && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 m-4 text-sm rounded shadow">
-          <p className="font-bold">Error de conexión:</p>
-          <p className="font-mono mt-1">{errorEstado}</p>
-        </div>
-      )}
-
       {/* Cuerpo Dividido */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Panel Izquierdo: Lista de Productos */}
+        {/* Panel Izquierdo: Catálogo Maestro */}
         <aside className="w-1/3 border-r bg-white overflow-y-auto p-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             Artículos Estandarizados ({productos.length})
           </h2>
 
           {cargandoLista ? (
-            <div className="p-4 text-gray-400 text-sm animate-pulse">
-              Cargando catálogo maestro...
-            </div>
+            <p className="text-gray-400 text-sm">Cargando catálogo...</p>
           ) : productos.length === 0 ? (
-            <div className="p-4 text-gray-500 text-sm border border-dashed rounded">
-              No se encontraron artículos en el catálogo.
-            </div>
+            <p className="text-gray-500 text-sm">No hay productos en el catálogo maestro.</p>
           ) : (
             <div className="space-y-2">
               {productos.map((item) => (
@@ -141,25 +113,26 @@ export default function HomePage() {
                   }`}
                 >
                   <p className="text-sm font-semibold">{item.nombre_estandarizado}</p>
-                  <span className="inline-block text-xs text-gray-500 mt-1">
-                    Categoría: {item.categoria || 'General'}
-                  </span>
                 </button>
               ))}
             </div>
           )}
         </aside>
 
-        {/* Panel Derecho: Comparativa de Precios */}
+        {/* Panel Derecho: Tabla Comparativa de Precios */}
         <main className="flex-1 bg-gray-50 overflow-y-auto p-8">
           {productoSeleccionado ? (
             <div>
               <div className="mb-6 bg-white p-6 rounded-lg border shadow-sm">
-                <span className="text-xs font-semibold text-blue-600 uppercase">Artículo Seleccionado</span>
-                <h2 className="text-2xl font-bold text-gray-800">{productoSeleccionado.nombre_estandarizado}</h2>
+                <span className="text-xs font-semibold text-blue-600 uppercase">
+                  Artículo Estandarizado Seleccionado
+                </span>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {productoSeleccionado.nombre_estandarizado}
+                </h2>
               </div>
 
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">Comparativa de Proveedores</h3>
+              <h3 className="text-lg font-semibold text-gray-700 mb-4">Comparativa de Precios</h3>
 
               {cargandoComparativa ? (
                 <p className="text-gray-400 text-sm">Cargando precios comparativos...</p>
@@ -173,18 +146,15 @@ export default function HomePage() {
                     <thead>
                       <tr className="bg-gray-100 border-b text-xs font-semibold text-gray-600 uppercase">
                         <th className="p-4">Proveedor</th>
-                        <th className="p-4">Nombre en Lista del Proveedor</th>
+                        <th className="p-4">Nombre Original en Lista</th>
                         <th className="p-4 text-right">Precio Registrado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y text-sm">
                       {comparativa.map((fila, idx) => (
                         <tr key={fila.id} className={idx === 0 ? 'bg-green-50/50 font-medium' : ''}>
-                          <td className="p-4">
-                            <p className="font-semibold text-gray-800">
-                              {fila.proveedores?.nombre || 'Proveedor Desconocido'}
-                            </p>
-                            <span className="text-xs text-gray-500">{fila.proveedores?.telefono}</span>
+                          <td className="p-4 font-semibold text-gray-800">
+                            {fila.nombre_proveedor}
                           </td>
                           <td className="p-4 text-gray-600">{fila.nombre_original}</td>
                           <td className="p-4 text-right font-bold text-gray-900">
@@ -204,7 +174,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="flex h-full items-center justify-center text-gray-400">
-              Selecciona un producto de la izquierda para comparar precios.
+              Selecciona un producto de la izquierda para ver los precios.
             </div>
           )}
         </main>
