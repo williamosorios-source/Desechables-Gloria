@@ -2,12 +2,13 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabase';
 
 export default function HomePage() {
   const [productos, setProductos] = useState<any[]>([]);
+  const [busqueda, setBusqueda] = useState('');
   const [productoSeleccionado, setProductoSeleccionado] = useState<any | null>(null);
   const [comparativa, setComparativa] = useState<any[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -40,7 +41,15 @@ export default function HomePage() {
     obtenerCatalogo();
   }, []);
 
-  // 2. Cargar precios comparativos filtrando por catalogo_id
+  // 2. Filtrar productos en tiempo real según lo ingresado en el buscador
+  const productosFiltrados = useMemo(() => {
+    if (!busqueda.trim()) return productos;
+    return productos.filter((item) =>
+      item.nombre_estandarizado.toLowerCase().includes(busqueda.toLowerCase())
+    );
+  }, [productos, busqueda]);
+
+  // 3. Cargar precios comparativos filtrando por catalogo_id
   const seleccionarProducto = async (prod: any) => {
     if (!prod || !prod.id) return;
     setProductoSeleccionado(prod);
@@ -64,11 +73,11 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 flex flex-col overflow-hidden">
       {/* Encabezado Superior */}
-      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+      <header className="bg-white border-b px-8 py-4 flex justify-between items-center shrink-0 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Mercadeo Institucional</h1>
+          <h1 className="text-xl font-bold text-gray-800">Desechables Gloria</h1>
           <p className="text-xs text-gray-500">Gestión centralizada de compras y proveedores</p>
         </div>
 
@@ -88,39 +97,64 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Cuerpo Dividido */}
+      {/* Cuerpo Dividido con Scroll Independiente */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Panel Izquierdo: Catálogo Maestro */}
-        <aside className="w-1/3 border-r bg-white overflow-y-auto p-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-            Artículos Estandarizados ({productos.length})
-          </h2>
+        {/* Panel Izquierdo: Catálogo Maestro con Buscador y Scroll Propio */}
+        <aside className="w-1/3 border-r bg-white flex flex-col h-full">
+          {/* Cabecera Fija del Panel Izquierdo */}
+          <div className="p-4 border-b shrink-0 bg-white">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Artículos Estandarizados ({productosFiltrados.length})
+            </h2>
 
-          {cargandoLista ? (
-            <p className="text-gray-400 text-sm">Cargando catálogo...</p>
-          ) : productos.length === 0 ? (
-            <p className="text-gray-500 text-sm">No hay productos en el catálogo maestro.</p>
-          ) : (
-            <div className="space-y-2">
-              {productos.map((item) => (
+            {/* Campo Buscador */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Buscar producto..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full pl-3 pr-8 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+              />
+              {busqueda && (
+                <button
+                  onClick={() => setBusqueda('')}
+                  className="absolute right-2 top-2 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Lista Scrolleable Independiente */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {cargandoLista ? (
+              <p className="text-gray-400 text-sm">Cargando catálogo...</p>
+            ) : productosFiltrados.length === 0 ? (
+              <p className="text-gray-500 text-sm py-4 text-center">
+                No se encontraron productos coincidentes.
+              </p>
+            ) : (
+              productosFiltrados.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => seleccionarProducto(item)}
                   className={`w-full text-left p-3 rounded-lg border transition ${
                     productoSeleccionado?.id === item.id
-                      ? 'border-blue-500 bg-blue-50 text-blue-900 font-medium'
+                      ? 'border-blue-500 bg-blue-50 text-blue-900 font-medium shadow-sm'
                       : 'border-gray-200 hover:bg-gray-50 text-gray-700'
                   }`}
                 >
                   <p className="text-sm font-semibold">{item.nombre_estandarizado}</p>
                 </button>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </aside>
 
-        {/* Panel Derecho: Tabla Comparativa de Precios */}
-        <main className="flex-1 bg-gray-50 overflow-y-auto p-8">
+        {/* Panel Derecho: Tabla Comparativa de Precios con Scroll Propio */}
+        <main className="flex-1 bg-gray-50 overflow-y-auto p-8 h-full">
           {productoSeleccionado ? (
             <div>
               <div className="mb-6 bg-white p-6 rounded-lg border shadow-sm">
